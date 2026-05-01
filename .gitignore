@@ -1,0 +1,12 @@
+# Arquivos compilados de C
+*.o
+*.exe
+*.out
+*.dll
+*.so
+
+# Configurações do VS Code (opcional)
+.vscode/
+
+# Executável do projeto
+simulador
