@@ -79,7 +79,7 @@ Cache *cache_criar(int bytes_totais, int bytes_bloco, int vias,
         for (j = 0; j < vias; j++) {
             c->conjuntos[i].vias[j].etiqueta  = 0;
             c->conjuntos[i].vias[j].valido    = 0;
-            c->conjuntos[i].vias[j].sujo      = 0;
+            c->conjuntos[i].vias[j].bit_sujo      = 0;
             c->conjuntos[i].vias[j].rrpv      = 0;
             c->conjuntos[i].vias[j].idade_lru = 0;
         }
@@ -146,7 +146,7 @@ int cache_acessar(Cache *c, uint32_t endereco)
     /* 5. insere o novo bloco no slot escolhido */
     conjunto->vias[vitima].etiqueta = etiqueta;
     conjunto->vias[vitima].valido   = 1;
-    conjunto->vias[vitima].sujo     = 0;
+    conjunto->vias[vitima].bit_sujo     = 0;
 
     /* PONTO DE POLÍTICA — INSERÇÃO */
     politica_na_insercao(c, conjunto, vitima);

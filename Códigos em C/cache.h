@@ -10,7 +10,7 @@
 typedef struct {
     uint32_t etiqueta;   /* Tag: identifica o endereço */
     int      valido;     /* 1 = bloco tem dado real | 0 = vazio */
-    int      sujo;       /* 1 = modificado (dirty bit) */
+    int      bit_sujo;       /* 1 = modificado (dirty bit) */
 
     /* Metadados para políticas */
     int rrpv;           
