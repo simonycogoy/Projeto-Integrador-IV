@@ -6,6 +6,8 @@ Breve descrição do que este projeto faz.
 Para compilar basta seguir o passo a passo no terminal:
 
 1º -> 
+
+
       gcc gerar_trace.c -o gerar_trace
 
       gcc -Wall -o simulador cache.c main.c
