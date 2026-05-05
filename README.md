@@ -15,5 +15,8 @@ Para compilar basta seguir o passo a passo no terminal:
 Logo após esse comando vai aparecer um arquivo chamado "simulador" e basta fazer o segundo passo
 
 2º -> 
+      
+      
+      
       ./gerar_trace
       ./simulador trace.txt
