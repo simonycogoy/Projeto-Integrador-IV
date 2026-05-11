@@ -1,0 +1,11 @@
+# Trace pequeno para validar DRRIP no conjunto monitor BRRIP da L1
+# Configuracao esperada: L1 4KB, bloco 32B, 2 vias; L2 32KB, bloco 64B, 8 vias
+# A = 0x00000100, B = 0x00000900, C = 0x00001100
+# Todos caem no mesmo conjunto da L1: indice 8
+0x00000100
+0x00000100
+0x00000900
+0x00001100
+0x00000100
+0x00000900
+0x00001100

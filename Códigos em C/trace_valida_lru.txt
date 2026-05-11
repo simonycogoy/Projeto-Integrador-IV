@@ -1,0 +1,14 @@
+# Trace pequeno para validar LRU na configuracao padrao:
+# L1 = 4KB, bloco 32B, 2 vias
+# L2 = 32KB, bloco 64B, 8 vias
+# A = 0x00000000
+# B = 0x00000800
+# C = 0x00001000
+0x00000000
+0x00000000
+0x00000800
+0x00000000
+0x00001000
+0x00000800
+0x00000000
+0x00001000
