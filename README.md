@@ -1,22 +1,28 @@
-# Projeto Integrador IV - Simulador de Cache
+# Projeto Cache
 
-Breve descrição do que este projeto faz.
+## Compilar
 
-## Como compilar
-Para compilar basta seguir o passo a passo no terminal:
+make
 
-1º -> 
+## Gerar traces
 
+./gerar_trace 1   # trace_streaming.txt
+./gerar_trace 2   # trace_matrix.txt
+./gerar_trace 3   # trace_linked_list.txt
+./gerar_trace 4   # trace_pattern.txt
+./gerar_trace 5   # trace_todos.txt
+./gerar_trace 6   # trace_validacao.txt
 
-      gcc gerar_trace.c -o gerar_trace
+## Rodar uma configuração padrão
 
-      gcc -Wall -o simulador cache.c main.c
+./simulador_lru trace_streaming.txt
+./simulador_drrip trace_streaming.txt
 
-Logo após esse comando vai aparecer um arquivo chamado "simulador" e basta fazer o segundo passo
+## Rodar todas as 16 combinações da especificação e salvar CSV
 
-2º -> 
-      
-      
-      
-      ./gerar_trace
-      ./simulador trace.txt
+./simulador_lru trace_streaming.txt --all resultados_lru.csv
+./simulador_drrip trace_streaming.txt --all resultados_drrip.csv
+
+As combinações usam:
+- L1: 4 KB ou 8 KB; bloco 32 B; 2 ou 4 vias.
+- L2: 32 KB ou 128 KB; bloco 64 B; 8 ou 16 vias.
