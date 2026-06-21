@@ -1,0 +1,128 @@
+
+// tb_drrip.v
+// Testbench simples para drrip.
+// NÃO entra na síntese do Quartus.
+
+`timescale 1ns/1ps
+
+module tb_drrip;
+
+    // Sinais de estimulo
+    reg         clk;
+    reg         rst;
+    reg         access_valid;
+    reg         access_is_hit;
+    reg  [5:0]  set_idx;
+    reg  [3:0]  valid_vec;
+    reg  [1:0]  hit_way;
+    reg         refill_valid;
+
+    // Saídas do DUT
+    wire [1:0]  victim_way;
+    wire        victim_found;
+    wire [1:0]  insert_rrpv;
+    wire        psel_msb_policy;
+
+    // Instância do DUT
+    drrip uut (
+        .clk             (clk),
+        .rst             (rst),
+        .access_valid    (access_valid),
+        .access_is_hit   (access_is_hit),
+        .set_idx         (set_idx),
+        .valid_vec       (valid_vec),
+        .hit_way         (hit_way),
+        .refill_valid    (refill_valid),
+        .victim_way      (victim_way),
+        .victim_found    (victim_found),
+        .insert_rrpv     (insert_rrpv),
+        .psel_msb_policy (psel_msb_policy)
+    );
+
+    // Geração do clock
+    initial begin
+        clk = 0;
+        forever #5 clk = ~clk;
+    end
+
+    // Procedimento de teste
+    initial begin
+        // Inicialização dos sinais de controle
+        access_valid  = 0;
+        access_is_hit = 0;
+        set_idx       = 6'd0;
+        valid_vec     = 4'b0000;
+        hit_way       = 2'd0;
+        refill_valid  = 0;
+
+        // Reset inicial
+        rst = 1;
+        #20;
+        rst = 0;
+        #10;
+
+        // Caso a) Refill com way inválida: set 0, nenhuma válida
+        $display("[TESTE] Caso a) Refill com way invalida");
+        access_valid  = 1;
+        access_is_hit = 0;
+        set_idx       = 6'd0;
+        valid_vec     = 4'b0000;
+        refill_valid  = 1;
+        #10;
+        $display("victim_way=%b victim_found=%b insert_rrpv=%b", victim_way, victim_found, insert_rrpv);
+        access_valid  = 0;
+        refill_valid  = 0;
+        #10;
+
+        // Caso b) Hit em uma way: set 0, validas = 0001, hit na way0
+        $display("[TESTE] Caso b) Hit em uma way");
+        access_valid  = 1;
+        access_is_hit = 1;
+        set_idx       = 6'd0;
+        valid_vec     = 4'b0001;
+        hit_way       = 2'd0;
+        refill_valid  = 0;
+        #10;
+        access_valid  = 0;
+        access_is_hit = 0;
+        #10;
+
+        // Caso c) Refill com todas válidas e vítima por RRPV=11
+        // No reset, todas as RRPVs foram inicializadas em 11, então way0 será escolhida
+        $display("[TESTE] Caso c) Refill com todas validas e vitima por RRPV=11");
+        access_valid  = 1;
+        access_is_hit = 0;
+        set_idx       = 6'd1;
+        valid_vec     = 4'b1111;
+        refill_valid  = 1;
+        #10;
+        $display("victim_way=%b victim_found=%b insert_rrpv=%b", victim_way, victim_found, insert_rrpv);
+        access_valid  = 0;
+        refill_valid  = 0;
+        #10;
+
+        // Caso d) Refill que force aging
+        // Prepara set 2: todas válidas, rrpv = 00,01,01,00. Nenhuma 11, então aging ocorre.
+        $display("[TESTE] Caso d) Refill que force aging");
+        // Escreve manualmente valores baixos nas memórias do set 2
+        uut.rrpv_way0_mem[2] = 2'b00;
+        uut.rrpv_way1_mem[2] = 2'b01;
+        uut.rrpv_way2_mem[2] = 2'b01;
+        uut.rrpv_way3_mem[2] = 2'b00;
+        #1;
+        access_valid  = 1;
+        access_is_hit = 0;
+        set_idx       = 6'd2;
+        valid_vec     = 4'b1111;
+        refill_valid  = 1;
+        #10;
+        $display("victim_way=%b victim_found=%b insert_rrpv=%b", victim_way, victim_found, insert_rrpv);
+        access_valid  = 0;
+        refill_valid  = 0;
+        #10;
+
+        $display("[TESTE] Fim da simulacao");
+        $finish;
+    end
+
+endmodule
