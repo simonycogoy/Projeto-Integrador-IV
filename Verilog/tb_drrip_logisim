@@ -1,0 +1,192 @@
+
+module tb_drrip_logisim;
+
+    reg         clock;
+    reg         reset;
+    reg  [3:0]  tag_in;
+    reg         acesso_valido;
+    reg         SRRIP_ou_BRRIP;
+
+    wire        hit0, hit1, hit2, hit3;
+    wire        eh_hit;
+    wire        rrpv0_igual_3, rrpv1_igual_3, rrpv2_igual_3, rrpv3_igual_3;
+    wire        rrpv_igual_3;
+    wire        rrpv0_menor_3, rrpv1_menor_3, rrpv2_menor_3, rrpv3_menor_3;
+    wire [1:0]  idade_rrpv0, idade_rrpv1, idade_rrpv2, idade_rrpv3;
+    wire [1:0]  rrpv0_mais_1, rrpv1_mais_1, rrpv2_mais_1, rrpv3_mais_1;
+    wire [1:0]  rrpv0_hit, rrpv1_hit, rrpv2_hit, rrpv3_hit;
+    wire        invalid0, invalid1, invalid2, invalid3;
+    wire        invalido;
+    wire        miss;
+    wire        envelhecer_rrpvs;
+    wire [1:0]  via_vitima;
+    wire        vitima0, vitima1, vitima2, vitima3;
+    wire        vitima_encontrada;
+    wire [1:0]  insercao_rrpv;
+    wire        enable_tag;
+    wire        grava_tag0, grava_tag1, grava_tag2, grava_tag3;
+    wire [1:0]  prox_rrpv0, prox_rrpv1, prox_rrpv2, prox_rrpv3;
+    wire [1:0]  rrpv0_next, rrpv1_next, rrpv2_next, rrpv3_next;
+
+    drrip_logisim dut (
+        .clock           (clock),
+        .reset           (reset),
+        .tag_in          (tag_in),
+        .acesso_valido   (acesso_valido),
+        .SRRIP_ou_BRRIP  (SRRIP_ou_BRRIP),
+        .hit0            (hit0),
+        .hit1            (hit1),
+        .hit2            (hit2),
+        .hit3            (hit3),
+        .eh_hit          (eh_hit),
+        .rrpv0_igual_3   (rrpv0_igual_3),
+        .rrpv1_igual_3   (rrpv1_igual_3),
+        .rrpv2_igual_3   (rrpv2_igual_3),
+        .rrpv3_igual_3   (rrpv3_igual_3),
+        .rrpv_igual_3    (rrpv_igual_3),
+        .rrpv0_menor_3   (rrpv0_menor_3),
+        .rrpv1_menor_3   (rrpv1_menor_3),
+        .rrpv2_menor_3   (rrpv2_menor_3),
+        .rrpv3_menor_3   (rrpv3_menor_3),
+        .idade_rrpv0     (idade_rrpv0),
+        .idade_rrpv1     (idade_rrpv1),
+        .idade_rrpv2     (idade_rrpv2),
+        .idade_rrpv3     (idade_rrpv3),
+        .rrpv0_mais_1    (rrpv0_mais_1),
+        .rrpv1_mais_1    (rrpv1_mais_1),
+        .rrpv2_mais_1    (rrpv2_mais_1),
+        .rrpv3_mais_1    (rrpv3_mais_1),
+        .rrpv0_hit       (rrpv0_hit),
+        .rrpv1_hit       (rrpv1_hit),
+        .rrpv2_hit       (rrpv2_hit),
+        .rrpv3_hit       (rrpv3_hit),
+        .invalid0        (invalid0),
+        .invalid1        (invalid1),
+        .invalid2        (invalid2),
+        .invalid3        (invalid3),
+        .invalido        (invalido),
+        .miss            (miss),
+        .envelhecer_rrpvs(envelhecer_rrpvs),
+        .via_vitima      (via_vitima),
+        .vitima0         (vitima0),
+        .vitima1         (vitima1),
+        .vitima2         (vitima2),
+        .vitima3         (vitima3),
+        .vitima_encontrada(vitima_encontrada),
+        .insercao_rrpv   (insercao_rrpv),
+        .enable_tag      (enable_tag),
+        .grava_tag0      (grava_tag0),
+        .grava_tag1      (grava_tag1),
+        .grava_tag2      (grava_tag2),
+        .grava_tag3      (grava_tag3),
+        .prox_rrpv0      (prox_rrpv0),
+        .prox_rrpv1      (prox_rrpv1),
+        .prox_rrpv2      (prox_rrpv2),
+        .prox_rrpv3      (prox_rrpv3),
+        .rrpv0_next      (rrpv0_next),
+        .rrpv1_next      (rrpv1_next),
+        .rrpv2_next      (rrpv2_next),
+        .rrpv3_next      (rrpv3_next)
+    );
+
+    initial begin
+        clock = 0;
+        forever #10 clock = ~clock;
+    end
+
+    initial begin
+        reset = 1;
+        #30;
+        reset = 0;
+    end
+
+    initial begin
+        $dumpfile("tb_drrip_logisim.vcd");
+        $dumpvars(0, tb_drrip_logisim);
+    end
+
+    task aplicar_acesso;
+        input [3:0] tag;
+        input modo;
+        begin
+            @(posedge clock);
+            #1;
+            tag_in = tag;
+            SRRIP_ou_BRRIP = modo;
+            acesso_valido = 1;
+            @(posedge clock);
+            #1;
+            acesso_valido = 0;
+        end
+    endtask
+
+    task verificar;
+        input condicao;
+        input [256*8:1] nome_teste;
+        begin
+            if (condicao)
+                $display("PASSOU: %0s", nome_teste);
+            else
+                $display("FALHOU: %0s", nome_teste);
+        end
+    endtask
+
+    initial begin
+        acesso_valido = 0;
+        SRRIP_ou_BRRIP = 0;
+        tag_in = 4'h0;
+
+        #40;
+
+        // Teste 1: tag=4'hA, SRRIP=0 -> miss, via_vitima=0
+        aplicar_acesso(4'hA, 0);
+        #1;
+        verificar(miss == 1 && via_vitima == 2'd0, "Teste 1 - Miss via 0");
+        #40;
+
+        // Teste 2: tag=4'hB, SRRIP=0 -> miss, via_vitima=1
+        aplicar_acesso(4'hB, 0);
+        #1;
+        verificar(miss == 1 && via_vitima == 2'd1, "Teste 2 - Miss via 1");
+        #40;
+
+        // Teste 3: tag=4'hC, SRRIP=0 -> miss, via_vitima=2
+        aplicar_acesso(4'hC, 0);
+        #1;
+        verificar(miss == 1 && via_vitima == 2'd2, "Teste 3 - Miss via 2");
+        #40;
+
+        // Teste 4: tag=4'hD, SRRIP=0 -> miss, via_vitima=3
+        aplicar_acesso(4'hD, 0);
+        #1;
+        verificar(miss == 1 && via_vitima == 2'd3, "Teste 4 - Miss via 3");
+        #40;
+
+        // Teste 5: tag=4'hA, SRRIP=0 -> HIT (eh_hit=1, hit0=1)
+        aplicar_acesso(4'hA, 0);
+        #1;
+        verificar(eh_hit == 1 && hit0 == 1, "Teste 5 - Hit via 0");
+        #40;
+
+        // Teste 6: tag=4'hE, SRRIP=0 -> miss com envelhecimento
+        aplicar_acesso(4'hE, 0);
+        #1;
+        verificar(miss == 1 && envelhecer_rrpvs == 1, "Teste 6 - Miss com envelhecimento");
+        #40;
+
+        // Teste 7: tag=4'hB, BRRIP=1 -> HIT (eh_hit=1, hit1=1, rrpv1_next=2)
+        aplicar_acesso(4'hB, 1);
+        #1;
+        verificar(eh_hit == 1 && hit1 == 1 && rrpv1_next == 2'd2, "Teste 7 - Hit via 1 BRRIP");
+        #40;
+
+        // Teste 8: tag=4'hF, BRRIP=1 -> miss (insercao_rrpv=2)
+        aplicar_acesso(4'hF, 1);
+        #1;
+        verificar(miss == 1 && insercao_rrpv == 2'd2, "Teste 8 - Miss BRRIP insercao_rrpv=2");
+        #40;
+
+        $finish;
+    end
+
+endmodule
