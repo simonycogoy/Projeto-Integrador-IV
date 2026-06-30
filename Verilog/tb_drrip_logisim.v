@@ -1,4 +1,4 @@
-// timescale removido para compilar no Quartus
+// timescale removido para compilar no Quartus, verificar se é um erro que sempre da
 module tb_drrip_logisim;
 
     reg         clock;
