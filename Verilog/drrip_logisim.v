@@ -34,8 +34,9 @@ module drrip_logisim (
 
     // ESTADO DA CACHE (registradores sincronizados com o clock)
         // para cada um das 4 vias
-        // guardamos o tag, valid e rrpv reg [3:0] tag0, tag1, tag2, tag3;
+        // guardamos o tag, valid e rrpv
     
+    reg [3:0] tag0, tag1, tag2, tag3;
     reg       valid0, valid1, valid2, valid3;
     reg [1:0] rrpv0, rrpv1, rrpv2, rrpv3;
 
