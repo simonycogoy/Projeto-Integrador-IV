@@ -1,203 +1,121 @@
-//==============================================================================
-// ARQUIVO 1: cache_unica.v
-//------------------------------------------------------------------------------
-// L2 Cache Simplificada (4 conjuntos) baseada no modulo drrip_logisim.
+// cache_unica.v
+// Versao final correta da cache L1 unificada com politica DRRIP.
 //
-// Arquitetura minima e defensavel academicamente:
-//  - 4 conjuntos (sets), cada conjunto eh uma instancia de drrip_logisim.
-//  - Cada instancia de drrip_logisim implementa UM conjunto 4-way com
-//    politica de substituicao SRRIP/BRRIP (ja existente).
-//  - Endereco de 8 bits com o seguinte formato:
-//        addr_in[7:4] = tag           (4 bits)
-//        addr_in[3:2] = indice do conjunto (2 bits)
-//        addr_in[1:0] = offset       (ignorado nesta abstracao)
-//  - O wrapper seleciona qual conjunto recebe "acesso_valido" com base no
-//    indice extraido do endereco.
-//  - As saidas globais da L2 refletem SOMENTE o conjunto selecionado no acesso
-//    atual (multiplexacao simples).
+// Organizacao da cache L1:
+//   - Capacidade total : 4 KB (4096 bytes)
+//   - Bytes por bloco  : 32 B  -> offset de 5 bits
+//   - Numero de vias   : 4
+//   - Numero de conjuntos : 32 -> indice de 5 bits
+//   - Tag              : 14 - 5 - 5 = 4 bits
 //
-// Esta L2 nao implementa processador nem memoria real: ela apenas organiza
-// 4 conjuntos DRRIP e expoe as metricas do conjunto acessado. O testbench
-// sera o gerador de acessos.
-//==============================================================================
+// Decomposicao do endereco addr_in[13:0]:
+//   [4:0]   -> offset  (5 bits) - existe apenas na decomposicao; ignorado pelo modelo abstrato
+//   [9:5]   -> indice do conjunto (5 bits)
+//   [13:10] -> tag (4 bits)
+//
+// Compatibilidade Quartus 13 / ModelSim antigos:
+//   - Nao usa arrays unpacked (wire [1:0] x [0:N]).
+//   - Sinais de 1 bit por conjunto  -> vetor empacotado de 32 bits.
+//   - Sinais de 2 bits por conjunto -> vetor empacotado de 64 bits.
+//   - Selecao por conjunto via indexed part-select: [(2*index)+:2].
+//   - 32 instancias de drrip_logisim criadas via generate.
+
 module cache_unica (
     input  wire        clock,
     input  wire        reset,
-    input  wire [7:0]  addr_in,
+    input  wire [13:0] addr_in,
     input  wire        acesso_valido,
-    input  wire        SRRIP_ou_BRRIP,   // 0 = SRRIP, 1 = BRRIP
-
-    // Saidas globais (do conjunto selecionado no acesso atual)
+    input  wire        SRRIP_ou_BRRIP,
     output wire        eh_hit,
     output wire        miss,
     output wire        invalido,
     output wire [1:0]  via_vitima,
     output wire        vitima_encontrada,
     output wire [1:0]  insercao_rrpv,
-    output wire [1:0]  set_index,        // indice do conjunto selecionado
-    output wire [3:0]  tag_extraida,     // tag extraida do endereco
-
-    // Saidas opcionais: hits por via do conjunto selecionado
+    output wire [4:0]  set_index,
+    output wire [3:0]  tag_extraida,
     output wire        hit0,
     output wire        hit1,
     output wire        hit2,
     output wire        hit3
 );
 
-    // -----------------------------------------------------------------------
-    // Extracao de campos do endereco (formato definido na arquitetura)
-    // -----------------------------------------------------------------------
-    wire [3:0] tag = addr_in[7:4];   // tag
-    wire [1:0] idx = addr_in[3:2];   // indice do conjunto (0..3)
-    // addr_in[1:0] = offset -> ignorado nesta abstracao
+    // ----------------------------------------------------------------------
+    // Decomposicao do endereco
+    // ----------------------------------------------------------------------
+    wire [4:0] offset_interno; // existe apenas para documentar; ignorado pelo modelo abstrato
+    wire [4:0] index;          // indice do conjunto (5 bits -> 32 conjuntos)
+    wire [3:0] tag;            // tag (4 bits)
 
-    assign set_index    = idx;
+    assign offset_interno = addr_in[4:0];    // 5 bits de offset (32 B por bloco)
+    assign index          = addr_in[9:5];    // 5 bits de indice (32 conjuntos)
+    assign tag            = addr_in[13:10];  // 4 bits de tag
+
+    assign set_index    = index;
     assign tag_extraida = tag;
 
-    // -----------------------------------------------------------------------
-    // Demux de acesso_valido: so a instancia cujo indice bate recebe 1.
-    // -----------------------------------------------------------------------
-    wire valid_set0 = acesso_valido & (idx == 2'b00);
-    wire valid_set1 = acesso_valido & (idx == 2'b01);
-    wire valid_set2 = acesso_valido & (idx == 2'b10);
-    wire valid_set3 = acesso_valido & (idx == 2'b11);
+    // ----------------------------------------------------------------------
+    // Vetores empacotados para saidas de cada conjunto (32 conjuntos)
+    // Sinais de 1 bit por conjunto  -> 32 bits
+    // Sinais de 2 bits por conjunto -> 64 bits (32 * 2)
+    // ----------------------------------------------------------------------
+    wire [31:0] eh_hit_set;
+    wire [31:0] miss_set;
+    wire [31:0] invalido_set;
+    wire [31:0] vitima_encontrada_set;
+    wire [31:0] hit0_set;
+    wire [31:0] hit1_set;
+    wire [31:0] hit2_set;
+    wire [31:0] hit3_set;
 
-    // -----------------------------------------------------------------------
-    // Sinais internos de cada instancia de drrip_logisim.
-    // Mantemos apenas as saidas essenciais para a L2 simplificada.
-    // -----------------------------------------------------------------------
-    wire        s0_eh_hit, s0_miss, s0_invalido, s0_vitima_encontrada;
-    wire [1:0]  s0_via_vitima, s0_insercao_rrpv;
-    wire        s0_hit0, s0_hit1, s0_hit2, s0_hit3;
+    wire [63:0] via_vitima_set;     // 32 conjuntos x 2 bits
+    wire [63:0] insercao_rrpv_set;  // 32 conjuntos x 2 bits
 
-    wire        s1_eh_hit, s1_miss, s1_invalido, s1_vitima_encontrada;
-    wire [1:0]  s1_via_vitima, s1_insercao_rrpv;
-    wire        s1_hit0, s1_hit1, s1_hit2, s1_hit3;
+    // Sinal de acesso valido por conjunto (apenas o conjunto selecionado e ativado)
+    wire [31:0] acesso_valido_set;
 
-    wire        s2_eh_hit, s2_miss, s2_invalido, s2_vitima_encontrada;
-    wire [1:0]  s2_via_vitima, s2_insercao_rrpv;
-    wire        s2_hit0, s2_hit1, s2_hit2, s2_hit3;
+    // ----------------------------------------------------------------------
+    // Instanciacao de 32 modulos drrip_logisim (um por conjunto)
+    // ----------------------------------------------------------------------
+    genvar i;
+    generate
+        for (i = 0; i < 32; i = i + 1) begin : gen_set
+            // Ativa apenas o modulo correspondente ao conjunto do acesso atual
+            assign acesso_valido_set[i] = acesso_valido && (index == i[4:0]);
 
-    wire        s3_eh_hit, s3_miss, s3_invalido, s3_vitima_encontrada;
-    wire [1:0]  s3_via_vitima, s3_insercao_rrpv;
-    wire        s3_hit0, s3_hit1, s3_hit2, s3_hit3;
+            drrip_logisim u_drrip (
+                .clock(clock),
+                .reset(reset),
+                .tag_in(tag),
+                .acesso_valido(acesso_valido_set[i]),
+                .SRRIP_ou_BRRIP(SRRIP_ou_BRRIP),
+                .eh_hit(eh_hit_set[i]),
+                .miss(miss_set[i]),
+                .invalido(invalido_set[i]),
+                .via_vitima(via_vitima_set[(2*i) +: 2]),
+                .vitima_encontrada(vitima_encontrada_set[i]),
+                .insercao_rrpv(insercao_rrpv_set[(2*i) +: 2]),
+                .hit0(hit0_set[i]),
+                .hit1(hit1_set[i]),
+                .hit2(hit2_set[i]),
+                .hit3(hit3_set[i])
+            );
+        end
+    endgenerate
 
-    // -----------------------------------------------------------------------
-    // Instanciacao dos 4 conjuntos. A tag_in eh a mesma para todos, mas so o
-    // conjunto selecionado recebe acesso_valido = 1.
-    // -----------------------------------------------------------------------
-    drrip_logisim set0 (
-        .clock(clock),
-        .reset(reset),
-        .tag_in(tag),
-        .acesso_valido(valid_set0),
-        .SRRIP_ou_BRRIP(SRRIP_ou_BRRIP),
-        .eh_hit(s0_eh_hit),
-        .miss(s0_miss),
-        .invalido(s0_invalido),
-        .via_vitima(s0_via_vitima),
-        .vitima_encontrada(s0_vitima_encontrada),
-        .insercao_rrpv(s0_insercao_rrpv),
-        .hit0(s0_hit0), .hit1(s0_hit1), .hit2(s0_hit2), .hit3(s0_hit3)
-    );
-
-    drrip_logisim set1 (
-        .clock(clock),
-        .reset(reset),
-        .tag_in(tag),
-        .acesso_valido(valid_set1),
-        .SRRIP_ou_BRRIP(SRRIP_ou_BRRIP),
-        .eh_hit(s1_eh_hit),
-        .miss(s1_miss),
-        .invalido(s1_invalido),
-        .via_vitima(s1_via_vitima),
-        .vitima_encontrada(s1_vitima_encontrada),
-        .insercao_rrpv(s1_insercao_rrpv),
-        .hit0(s1_hit0), .hit1(s1_hit1), .hit2(s1_hit2), .hit3(s1_hit3)
-    );
-
-    drrip_logisim set2 (
-        .clock(clock),
-        .reset(reset),
-        .tag_in(tag),
-        .acesso_valido(valid_set2),
-        .SRRIP_ou_BRRIP(SRRIP_ou_BRRIP),
-        .eh_hit(s2_eh_hit),
-        .miss(s2_miss),
-        .invalido(s2_invalido),
-        .via_vitima(s2_via_vitima),
-        .vitima_encontrada(s2_vitima_encontrada),
-        .insercao_rrpv(s2_insercao_rrpv),
-        .hit0(s2_hit0), .hit1(s2_hit1), .hit2(s2_hit2), .hit3(s2_hit3)
-    );
-
-    drrip_logisim set3 (
-        .clock(clock),
-        .reset(reset),
-        .tag_in(tag),
-        .acesso_valido(valid_set3),
-        .SRRIP_ou_BRRIP(SRRIP_ou_BRRIP),
-        .eh_hit(s3_eh_hit),
-        .miss(s3_miss),
-        .invalido(s3_invalido),
-        .via_vitima(s3_via_vitima),
-        .vitima_encontrada(s3_vitima_encontrada),
-        .insercao_rrpv(s3_insercao_rrpv),
-        .hit0(s3_hit0), .hit1(s3_hit1), .hit2(s3_hit2), .hit3(s3_hit3)
-    );
-
-    // -----------------------------------------------------------------------
-    // Multiplexacao das saidas globais com base no indice selecionado.
-    // As saidas globais refletem SOMENTE o conjunto acessado no ciclo atual.
-    // -----------------------------------------------------------------------
-    assign eh_hit            = (idx == 2'b00) ? s0_eh_hit :
-                               (idx == 2'b01) ? s1_eh_hit :
-                               (idx == 2'b10) ? s2_eh_hit :
-                                                s3_eh_hit;
-
-    assign miss              = (idx == 2'b00) ? s0_miss :
-                               (idx == 2'b01) ? s1_miss :
-                               (idx == 2'b10) ? s2_miss :
-                                                s3_miss;
-
-    assign invalido         = (idx == 2'b00) ? s0_invalido :
-                               (idx == 2'b01) ? s1_invalido :
-                               (idx == 2'b10) ? s2_invalido :
-                                                s3_invalido;
-
-    assign via_vitima       = (idx == 2'b00) ? s0_via_vitima :
-                               (idx == 2'b01) ? s1_via_vitima :
-                               (idx == 2'b10) ? s2_via_vitima :
-                                                s3_via_vitima;
-
-    assign vitima_encontrada= (idx == 2'b00) ? s0_vitima_encontrada :
-                               (idx == 2'b01) ? s1_vitima_encontrada :
-                               (idx == 2'b10) ? s2_vitima_encontrada :
-                                                s3_vitima_encontrada;
-
-    assign insercao_rrpv    = (idx == 2'b00) ? s0_insercao_rrpv :
-                               (idx == 2'b01) ? s1_insercao_rrpv :
-                               (idx == 2'b10) ? s2_insercao_rrpv :
-                                                s3_insercao_rrpv;
-
-    assign hit0             = (idx == 2'b00) ? s0_hit0 :
-                               (idx == 2'b01) ? s1_hit0 :
-                               (idx == 2'b10) ? s2_hit0 :
-                                                s3_hit0;
-
-    assign hit1             = (idx == 2'b00) ? s0_hit1 :
-                               (idx == 2'b01) ? s1_hit1 :
-                               (idx == 2'b10) ? s2_hit1 :
-                                                s3_hit1;
-
-    assign hit2             = (idx == 2'b00) ? s0_hit2 :
-                               (idx == 2'b01) ? s1_hit2 :
-                               (idx == 2'b10) ? s2_hit2 :
-                                                s3_hit2;
-
-    assign hit3             = (idx == 2'b00) ? s0_hit3 :
-                               (idx == 2'b01) ? s1_hit3 :
-                               (idx == 2'b10) ? s2_hit3 :
-                                                s3_hit3;
+    // ----------------------------------------------------------------------
+    // Selecao das saidas globais: somente o conjunto do acesso atual
+    // Usa indexed part-select para os sinais de 2 bits: [(2*index)+:2]
+    // ----------------------------------------------------------------------
+    assign eh_hit            = eh_hit_set[index];
+    assign miss              = miss_set[index];
+    assign invalido          = invalido_set[index];
+    assign vitima_encontrada = vitima_encontrada_set[index];
+    assign via_vitima        = via_vitima_set[(2*index) +: 2];
+    assign insercao_rrpv     = insercao_rrpv_set[(2*index) +: 2];
+    assign hit0              = hit0_set[index];
+    assign hit1              = hit1_set[index];
+    assign hit2              = hit2_set[index];
+    assign hit3              = hit3_set[index];
 
 endmodule
