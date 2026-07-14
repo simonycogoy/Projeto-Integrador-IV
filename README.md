@@ -1,6 +1,9 @@
-# Projeto Integrador IV - Simulador de Cache
+# Projeto Integrador IV - Implementação do Algoritmo DRRIP para Caches Inteligentes
 
-Breve descrição do que este projeto faz.
+Descrição
+
+Links:
+Trello: https://trello.com/b/oAF5a7Ai/projeto-integrador-iv  
 
 ## Como compilar
 Para compilar basta seguir o passo a passo no terminal:
