@@ -9,4 +9,9 @@
 .vscode/
 
 # Executável do projeto
-simulador
+simuladorTabelas e Resultados/
+
+/Tabelas e Resultados/
+
+/Verilog/*
+!/Verilog/*.v
