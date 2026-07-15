@@ -22,7 +22,7 @@ module drrip_set (
     output wire        eh_hit,
     output wire        miss,
     output wire        possui_invalida,
-    output wire [1:0]  via_vitima,
+    output reg [1:0]   via_vitima;
     output wire        vitima_encontrada,
 
     output wire        hit0,
@@ -50,9 +50,6 @@ module drrip_set (
     reg [1:0] rrpv3;
 
     wire todas_validas;
-    wire [1:0] maior01;
-    wire [1:0] maior23;
-    wire [1:0] maior_rrpv;
     wire [1:0] incremento_idade;
 
     wire vitima0;
@@ -98,11 +95,36 @@ module drrip_set (
                            valid2 && valid3;
 
     // Descobre o maior RRPV existente no conjunto.
-    assign maior01 = (rrpv0 >= rrpv1) ? rrpv0 : rrpv1;
-    assign maior23 = (rrpv2 >= rrpv3) ? rrpv2 : rrpv3;
 
-    assign maior_rrpv =
-        (maior01 >= maior23) ? maior01 : maior23;
+    reg [1:0] maior01;
+    reg [1:0] maior23;
+    reg [1:0] maior_rrpv;
+
+    always @(*) begin
+    // Calcula o maior entre rrpv0 e rrpv1
+    if (rrpv0 >= rrpv1) begin
+        maior01 = rrpv0;
+    end
+    else begin
+        maior01 = rrpv1;
+    end
+
+    // Calcula o maior entre rrpv2 e rrpv3
+    if (rrpv2 >= rrpv3) begin
+        maior23 = rrpv2;
+    end
+    else begin
+        maior23 = rrpv3;
+    end
+
+    // Calcula o maior entre os dois resultados anteriores
+    if (maior01 >= maior23) begin
+        maior_rrpv = maior01;
+    end
+    else begin
+        maior_rrpv = maior23;
+    end
+end
 
     // Quantidade necessaria para fazer o maior RRPV chegar a 3.
     assign incremento_idade = 2'd3 - maior_rrpv;
@@ -136,12 +158,23 @@ module drrip_set (
     assign vitima_encontrada =
         vitima0 || vitima1 || vitima2 || vitima3;
 
-    assign via_vitima =
-        vitima0 ? 2'd0 :
-        vitima1 ? 2'd1 :
-        vitima2 ? 2'd2 :
-        vitima3 ? 2'd3 :
-                  2'd0;
+    always @(*) begin
+    if (vitima0) begin
+        via_vitima = 2'd0;
+    end
+    else if (vitima1) begin
+        via_vitima = 2'd1;
+    end
+    else if (vitima2) begin
+        via_vitima = 2'd2;
+    end
+    else if (vitima3) begin
+        via_vitima = 2'd3;
+    end
+    else begin
+        via_vitima = 2'd0;
+    end
+    end
 
     // --------------------------------------------------------------
     // Atualizacao na borda de subida do clock
