@@ -4,10 +4,10 @@
 // A cache principal envia o valor de RRPV que deve ser usado na insercao.
 //
 // Regras usadas:
-// - Hit: o bloco recebe RRPV = 0.
-// - Miss com via invalida: usa a primeira via invalida.
-// - Miss com todas as vias validas: substitui a primeira via com maior RRPV.
-// - Antes da substituicao, os RRPVs sao envelhecidos ate o maior chegar a 3.
+// Hit: o bloco recebe RRPV = 0.
+// Miss com via invalida: usa a primeira via invalida.
+// Miss com todas as vias validas: substitui a primeira via com maior RRPV.
+// Antes da substituicao, os RRPVs sao envelhecidos ate o maior chegar a 3.
 //
 // A escolha direta da maior idade equivale a repetir o envelhecimento
 // ate aparecer uma via com RRPV = 3, mas evita uma maquina de estados.
@@ -22,7 +22,7 @@ module drrip_set (
     output wire        eh_hit,
     output wire        miss,
     output wire        possui_invalida,
-    output reg [1:0]   via_vitima;
+    output reg [1:0]   via_vitima,
     output wire        vitima_encontrada,
 
     output wire        hit0,
@@ -72,10 +72,7 @@ module drrip_set (
         end
     endfunction
 
-    // --------------------------------------------------------------
     // Verificacao de hit
-    // --------------------------------------------------------------
-
     assign hit0 = acesso_valido && valid0 && (tag0 == tag_in);
     assign hit1 = acesso_valido && valid1 && (tag1 == tag_in);
     assign hit2 = acesso_valido && valid2 && (tag2 == tag_in);
@@ -84,21 +81,15 @@ module drrip_set (
     assign eh_hit = hit0 || hit1 || hit2 || hit3;
     assign miss   = acesso_valido && !eh_hit;
 
-    // --------------------------------------------------------------
     // Estado das vias
-    // --------------------------------------------------------------
+    assign possui_invalida = !valid0 || !valid1 || !valid2 || !valid3;
 
-    assign possui_invalida = !valid0 || !valid1 ||
-                             !valid2 || !valid3;
-
-    assign todas_validas = valid0 && valid1 &&
-                           valid2 && valid3;
+    assign todas_validas = valid0 && valid1 && valid2 && valid3;
 
     // Descobre o maior RRPV existente no conjunto.
-
-    reg [1:0] maior01;
-    reg [1:0] maior23;
-    reg [1:0] maior_rrpv;
+    reg [1:0] maior01; //maior RRPV entre as vias 0 e 1
+    reg [1:0] maior23; //maior RRPV entre as vias 2 e 3
+    reg [1:0] maior_rrpv; //maior RRPV entre todas as vias
 
     always @(*) begin
     // Calcula o maior entre rrpv0 e rrpv1
@@ -129,57 +120,43 @@ end
     // Quantidade necessaria para fazer o maior RRPV chegar a 3.
     assign incremento_idade = 2'd3 - maior_rrpv;
 
-    // --------------------------------------------------------------
     // Escolha da vitima
-    //
     // Prioridade:
     // 1. Primeira via invalida.
     // 2. Primeira via com o maior RRPV.
-    // --------------------------------------------------------------
+    assign vitima0 = miss && ((!valid0) || (todas_validas && (rrpv0 == maior_rrpv)));
 
-    assign vitima0 =
-        miss &&
-        ((!valid0) ||
-        (todas_validas && (rrpv0 == maior_rrpv)));
+    assign vitima1 = miss && !vitima0 && ((!valid1) || (todas_validas && (rrpv1 == maior_rrpv)));
 
-    assign vitima1 =
-        miss && !vitima0 &&
-        ((!valid1) ||
-        (todas_validas && (rrpv1 == maior_rrpv)));
+    assign vitima2 = miss && !vitima0 && !vitima1 && ((!valid2) || (todas_validas && (rrpv2 == maior_rrpv)));
 
-    assign vitima2 =
-        miss && !vitima0 && !vitima1 &&
-        ((!valid2) ||
-        (todas_validas && (rrpv2 == maior_rrpv)));
+    assign vitima3 = miss && !vitima0 && !vitima1 && !vitima2;
 
-    assign vitima3 =
-        miss && !vitima0 && !vitima1 && !vitima2;
-
-    assign vitima_encontrada =
-        vitima0 || vitima1 || vitima2 || vitima3;
+    assign vitima_encontrada = vitima0 || vitima1 || vitima2 || vitima3;
 
     always @(*) begin
     if (vitima0) begin
         via_vitima = 2'd0;
     end
+    
     else if (vitima1) begin
         via_vitima = 2'd1;
     end
+    
     else if (vitima2) begin
         via_vitima = 2'd2;
     end
+    
     else if (vitima3) begin
         via_vitima = 2'd3;
     end
+    
     else begin
         via_vitima = 2'd0;
     end
     end
 
-    // --------------------------------------------------------------
     // Atualizacao na borda de subida do clock
-    // --------------------------------------------------------------
-
     always @(posedge clock or posedge reset) begin
         if (reset) begin
             tag0 <= 22'd0;
